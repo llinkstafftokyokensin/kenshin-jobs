@@ -3,10 +3,202 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>健診医師求人データ</title>
+
+  <title>健診医師求人一覧</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #f5f7fa;
+      color: #222;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                   "Yu Gothic", "Meiryo", sans-serif;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin-bottom: 8px;
+    }
+
+    .description {
+      margin-top: 0;
+      color: #555;
+    }
+
+    .search-area {
+      margin: 20px 0;
+      padding: 16px;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    #searchInput {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #bbb;
+      border-radius: 6px;
+      font-size: 16px;
+    }
+
+    #resultCount {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    table {
+      width: 100%;
+      min-width: 1200px;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 10px;
+      border: 1px solid #ddd;
+      text-align: left;
+      vertical-align: top;
+      white-space: pre-wrap;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: #1769aa;
+      color: #fff;
+      white-space: nowrap;
+    }
+
+    tr:nth-child(even) {
+      background: #f8f9fb;
+    }
+
+    tr:hover {
+      background: #eef6ff;
+    }
+
+    .loading,
+    .error {
+      padding: 20px;
+      background: #fff;
+      border-radius: 8px;
+    }
+
+    .error {
+      color: #b00020;
+    }
+
+    .csv-link {
+      display: inline-block;
+      margin-bottom: 15px;
+    }
+
+    @media (max-width: 700px) {
+      body {
+        padding: 10px;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+    }
+  </style>
 </head>
+
 <body>
-  <h1>健診医師求人データ</h1>
-  <p>GitHub Pagesの公開テストです。</p>
-</body>
-</html>
+  <div class="container">
+    <h1>健診医師求人一覧</h1>
+
+    <p class="description">
+      現在公開中の健診医師求人を掲載しています。
+    </p>
+
+    <a class="csv-link" href="jobs.csv">
+      CSVデータを直接開く
+    </a>
+
+    <div class="search-area">
+      <input
+        id="searchInput"
+        type="search"
+        placeholder="勤務日、住所、駅、求人番号などで検索"
+      >
+
+      <div id="resultCount">読み込み中です……</div>
+    </div>
+
+    <div id="status" class="loading">
+      求人データを読み込んでいます……
+    </div>
+
+    <div id="tableArea" class="table-wrap" hidden>
+      <table>
+        <thead>
+          <tr id="tableHeader"></tr>
+        </thead>
+
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const csvFile = "jobs.csv";
+
+    const columns = [
+      { key: "category", label: "区分" },
+      { key: "job_number", label: "求人番号" },
+      { key: "work_date", label: "勤務日" },
+      { key: "address", label: "勤務地" },
+      { key: "station", label: "最寄駅" },
+      { key: "work_time", label: "勤務時間" },
+      { key: "payment", label: "給与" },
+      { key: "transport_fee", label: "交通費" },
+      { key: "task", label: "業務内容" },
+      { key: "count", label: "受診者数" },
+      { key: "special_note", label: "特記事項" },
+      { key: "search_guide", label: "検索案内" }
+    ];
+
+    let allJobs = [];
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function createHeader() {
+      const header = document.getElementById("tableHeader");
+
+      header.innerHTML = columns
+        .map(column => `<th>${escapeHtml(column.label)}</th>`)
+        .join("");
+    }
+
+    function renderJobs(jobs) {
+      const body = document.getElementById("tableBody");
+      const resultCount = document.getElementById("resultCount");
+
+      body.innerHTML = jobs.map(job => {
+        const cells = columns.map(column => {
+          return `<td>${escapeHtml(job[column.key])}</td>`;
+        }).joi
