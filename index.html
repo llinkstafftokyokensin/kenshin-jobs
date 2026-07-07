@@ -6,8 +6,6 @@
 
   <title>健診医師求人一覧</title>
 
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-
   <style>
     body {
       margin: 0;
@@ -186,6 +184,72 @@
         .replaceAll("'", "&#039;");
     }
 
+    function parseCSV(text) {
+      const rows = [];
+      let row = [];
+      let field = "";
+      let insideQuotes = false;
+
+      text = text.replace(/^\uFEFF/, "");
+
+      for (let i = 0; i < text.length; i++) {
+        const character = text[i];
+        const nextCharacter = text[i + 1];
+
+        if (character === '"') {
+          if (insideQuotes && nextCharacter === '"') {
+            field += '"';
+            i++;
+          } else {
+            insideQuotes = !insideQuotes;
+          }
+        } else if (character === "," && !insideQuotes) {
+          row.push(field);
+          field = "";
+        } else if (
+          (character === "\n" || character === "\r") &&
+          !insideQuotes
+        ) {
+          if (character === "\r" && nextCharacter === "\n") {
+            i++;
+          }
+
+          row.push(field);
+          field = "";
+
+          if (row.some(value => value.trim() !== "")) {
+            rows.push(row);
+          }
+
+          row = [];
+        } else {
+          field += character;
+        }
+      }
+
+      row.push(field);
+
+      if (row.some(value => value.trim() !== "")) {
+        rows.push(row);
+      }
+
+      if (rows.length === 0) {
+        return [];
+      }
+
+      const headers = rows[0].map(header => header.trim());
+
+      return rows.slice(1).map(values => {
+        const item = {};
+
+        headers.forEach((header, index) => {
+          item[header] = values[index] ?? "";
+        });
+
+        return item;
+      });
+    }
+
     function createHeader() {
       const header = document.getElementById("tableHeader");
 
@@ -201,4 +265,74 @@
       body.innerHTML = jobs.map(job => {
         const cells = columns.map(column => {
           return `<td>${escapeHtml(job[column.key])}</td>`;
-        }).joi
+        }).join("");
+
+        return `<tr>${cells}</tr>`;
+      }).join("");
+
+      resultCount.textContent = `${jobs.length}件の求人を表示しています`;
+    }
+
+    function filterJobs() {
+      const keyword = document
+        .getElementById("searchInput")
+        .value
+        .trim()
+        .toLowerCase();
+
+      if (!keyword) {
+        renderJobs(allJobs);
+        return;
+      }
+
+      const filteredJobs = allJobs.filter(job => {
+        return Object.values(job).some(value =>
+          String(value ?? "").toLowerCase().includes(keyword)
+        );
+      });
+
+      renderJobs(filteredJobs);
+    }
+
+    async function loadJobs() {
+      const status = document.getElementById("status");
+
+      try {
+        const response = await fetch(
+          `${csvFile}?time=${Date.now()}`,
+          { cache: "no-store" }
+        );
+
+        if (!response.ok) {
+          throw new Error(`CSV取得失敗：${response.status}`);
+        }
+
+        const csvText = await response.text();
+        allJobs = parseCSV(csvText);
+
+        status.hidden = true;
+        document.getElementById("tableArea").hidden = false;
+
+        renderJobs(allJobs);
+      } catch (error) {
+        status.className = "error";
+        status.textContent =
+          "求人データを読み込めませんでした。ページを再読み込みしてください。";
+
+        document.getElementById("resultCount").textContent =
+          "読み込みに失敗しました";
+
+        console.error(error);
+      }
+    }
+
+    createHeader();
+
+    document
+      .getElementById("searchInput")
+      .addEventListener("input", filterJobs);
+
+    loadJobs();
+  </script>
+</body>
+</html>
